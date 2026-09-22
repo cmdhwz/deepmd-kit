@@ -434,6 +434,21 @@ class DeepPotBackend : public DeepBaseModelBackend {
       const int nloc,
       const int nall_nodes,
       const std::int64_t edge_storage);
+  virtual void compute_canonical_graph_gpu_batch(
+      double* d_atom_energy,
+      double* d_force,
+      double* d_atom_virial,
+      const std::int64_t* d_atype,
+      const std::uint32_t* d_source,
+      const float* d_edge_vec,
+      const std::int64_t* d_destination_row_ptr,
+      const std::int64_t* d_source_row_ptr,
+      const std::uint32_t* d_source_order,
+      const std::int64_t* d_n_node,
+      const std::int64_t* d_n_local,
+      const int nframes,
+      const int nall_nodes,
+      const std::int64_t edge_storage);
   virtual bool supports_device_edge_inference() const;
   virtual bool uses_fp32_edge_vectors() const;
   virtual bool uses_canonical_graph_inference() const;
@@ -906,6 +921,21 @@ class DeepPot : public DeepBaseModel {
                                    const int nloc,
                                    const int nall_nodes,
                                    const std::int64_t edge_storage);
+  void compute_canonical_graph_gpu_batch(
+      double* d_atom_energy,
+      double* d_force,
+      double* d_atom_virial,
+      const std::int64_t* d_atype,
+      const std::uint32_t* d_source,
+      const float* d_edge_vec,
+      const std::int64_t* d_destination_row_ptr,
+      const std::int64_t* d_source_row_ptr,
+      const std::uint32_t* d_source_order,
+      const std::int64_t* d_n_node,
+      const std::int64_t* d_n_local,
+      const int nframes,
+      const int nall_nodes,
+      const std::int64_t edge_storage);
 
   int dim_chg_spin() const;
 

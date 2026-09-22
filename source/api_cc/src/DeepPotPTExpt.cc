@@ -2616,6 +2616,85 @@ void DeepPotPTExpt::compute_canonical_graph_gpu_impl(
   });
 }
 
+void DeepPotPTExpt::compute_canonical_graph_gpu_batch_impl(
+    double* d_atom_energy,
+    double* d_force,
+    double* d_atom_virial,
+    const std::int64_t* d_atype,
+    const std::uint32_t* d_source,
+    const float* d_edge_vec,
+    const std::int64_t* d_destination_row_ptr,
+    const std::int64_t* d_source_row_ptr,
+    const std::uint32_t* d_source_order,
+    const std::int64_t* d_n_node,
+    const std::int64_t* d_n_local,
+    const int nframes,
+    const int nall_nodes,
+    const std::int64_t edge_storage) {
+  if (!lower_input_is_canonical_) {
+    throw deepmd::deepmd_exception(
+        "compute_canonical_graph_gpu_batch requires a compact canonical "
+        "artifact.");
+  }
+  if (!gpu_enabled) {
+    throw deepmd::deepmd_exception(
+        "compute_canonical_graph_gpu_batch requires a CUDA device.");
+  }
+  if (nframes <= 0 || nall_nodes <= 0 || edge_storage < 2 ||
+      static_cast<std::uint64_t>(edge_storage) >
+          std::numeric_limits<std::uint32_t>::max()) {
+    throw deepmd::deepmd_exception(
+        "invalid batched compact canonical graph dimensions.");
+  }
+
+  translate_error([&] {
+    const torch::Device device(torch::kCUDA, gpu_id);
+    const c10::DeviceGuard device_guard(device);
+    const auto opt_f32 =
+        torch::TensorOptions().dtype(torch::kFloat32).device(device);
+    const auto opt_i64 =
+        torch::TensorOptions().dtype(torch::kInt64).device(device);
+    const auto opt_u32 = torch::TensorOptions()
+                             .dtype(deepmd::canonicalGraphIndexType())
+                             .device(device);
+    auto atype = torch::from_blob(const_cast<std::int64_t*>(d_atype),
+                                  {nall_nodes}, opt_i64);
+    auto source = torch::from_blob(const_cast<std::uint32_t*>(d_source),
+                                   {edge_storage}, opt_u32);
+    auto edge_vec = torch::from_blob(const_cast<float*>(d_edge_vec),
+                                     {edge_storage, 3}, opt_f32);
+    auto destination_row_ptr =
+        torch::from_blob(const_cast<std::int64_t*>(d_destination_row_ptr),
+                         {nall_nodes + 1}, opt_i64);
+    auto source_row_ptr = torch::from_blob(
+        const_cast<std::int64_t*>(d_source_row_ptr), {nall_nodes + 1}, opt_i64);
+    auto source_order = torch::from_blob(
+        const_cast<std::uint32_t*>(d_source_order), {edge_storage}, opt_u32);
+    auto n_node = torch::from_blob(const_cast<std::int64_t*>(d_n_node),
+                                   {nframes}, opt_i64);
+    auto n_local = torch::from_blob(const_cast<std::int64_t*>(d_n_local),
+                                    {nframes}, opt_i64);
+
+    std::map<std::string, torch::Tensor> output;
+    extract_outputs(
+        output,
+        run_model_canonical_graph(atype, n_node, n_local, source, edge_vec,
+                                  destination_row_ptr, source_row_ptr,
+                                  source_order));
+    auto atom_energy = output["atom_energy"].reshape({nall_nodes}).contiguous();
+    auto force = output["force"].reshape({nall_nodes, 3}).contiguous();
+    auto atom_virial =
+        output["atom_virial"].reshape({nall_nodes, 9}).contiguous();
+    const auto opt_f64 =
+        torch::TensorOptions().dtype(torch::kFloat64).device(device);
+    torch::from_blob(d_atom_energy, {nall_nodes}, opt_f64).copy_(atom_energy);
+    torch::from_blob(d_force, {nall_nodes, 3}, opt_f64).copy_(force);
+    torch::from_blob(d_atom_virial, {nall_nodes, 9}, opt_f64)
+        .copy_(atom_virial);
+    synchronize_current_accelerator_stream();
+  });
+}
+
 void DeepPotPTExpt::compute_edges_gpu(double* d_atom_energy,
                                       double* d_force,
                                       double* d_atom_virial,
@@ -2684,6 +2763,27 @@ void DeepPotPTExpt::compute_canonical_graph_gpu(
       d_atom_energy, d_force, d_atom_virial, d_atype, d_source, d_edge_vec,
       d_destination_row_ptr, d_source_row_ptr, d_source_order, nloc, nall_nodes,
       edge_storage);
+}
+
+void DeepPotPTExpt::compute_canonical_graph_gpu_batch(
+    double* d_atom_energy,
+    double* d_force,
+    double* d_atom_virial,
+    const std::int64_t* d_atype,
+    const std::uint32_t* d_source,
+    const float* d_edge_vec,
+    const std::int64_t* d_destination_row_ptr,
+    const std::int64_t* d_source_row_ptr,
+    const std::uint32_t* d_source_order,
+    const std::int64_t* d_n_node,
+    const std::int64_t* d_n_local,
+    const int nframes,
+    const int nall_nodes,
+    const std::int64_t edge_storage) {
+  compute_canonical_graph_gpu_batch_impl(
+      d_atom_energy, d_force, d_atom_virial, d_atype, d_source, d_edge_vec,
+      d_destination_row_ptr, d_source_row_ptr, d_source_order, d_n_node,
+      d_n_local, nframes, nall_nodes, edge_storage);
 }
 
 bool DeepPotPTExpt::uses_fp32_edge_vectors() const {

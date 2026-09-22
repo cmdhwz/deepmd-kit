@@ -385,6 +385,21 @@ class DeepPotPTExpt : public DeepPotBackend {
                                    const int nloc,
                                    const int nall_nodes,
                                    const std::int64_t edge_storage) override;
+  void compute_canonical_graph_gpu_batch(
+      double* d_atom_energy,
+      double* d_force,
+      double* d_atom_virial,
+      const std::int64_t* d_atype,
+      const std::uint32_t* d_source,
+      const float* d_edge_vec,
+      const std::int64_t* d_destination_row_ptr,
+      const std::int64_t* d_source_row_ptr,
+      const std::uint32_t* d_source_order,
+      const std::int64_t* d_n_node,
+      const std::int64_t* d_n_local,
+      const int nframes,
+      const int nall_nodes,
+      const std::int64_t edge_storage) override;
   /**
    * @brief FP32 edge-vector overload for compressed graph artifacts.
    *
@@ -440,6 +455,21 @@ class DeepPotPTExpt : public DeepPotBackend {
       const std::int64_t* d_source_row_ptr,
       const std::uint32_t* d_source_order,
       const int nloc,
+      const int nall_nodes,
+      const std::int64_t edge_storage);
+  void compute_canonical_graph_gpu_batch_impl(
+      double* d_atom_energy,
+      double* d_force,
+      double* d_atom_virial,
+      const std::int64_t* d_atype,
+      const std::uint32_t* d_source,
+      const float* d_edge_vec,
+      const std::int64_t* d_destination_row_ptr,
+      const std::int64_t* d_source_row_ptr,
+      const std::uint32_t* d_source_order,
+      const std::int64_t* d_n_node,
+      const std::int64_t* d_n_local,
+      const int nframes,
       const int nall_nodes,
       const std::int64_t edge_storage);
   bool inited;
