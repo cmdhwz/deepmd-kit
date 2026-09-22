@@ -921,6 +921,53 @@ class DeepPot : public DeepBaseModel {
                                    const int nloc,
                                    const int nall_nodes,
                                    const std::int64_t edge_storage);
+  /**
+   * @brief Evaluate a batch of compact canonical graphs packed into one node
+   * axis.
+   *
+   * All pointers refer to GPU memory on the loaded model's device. Frames are
+   * concatenated in input order. Within each frame, owned nodes precede ghost
+   * nodes; ``d_n_node`` and ``d_n_local`` contain the total and owned node
+   * counts for each frame. Their lengths are ``nframes`` and their values must
+   * satisfy ``sum(d_n_node) == nall_nodes`` and
+   * ``0 <= d_n_local[f] <= d_n_node[f]``.
+   *
+   * ``d_atype`` and the output arrays use the complete flattened node axis:
+   * ``d_atype`` has ``nall_nodes`` entries, ``d_atom_energy`` has
+   * ``nall_nodes`` entries, ``d_force`` has ``nall_nodes * 3`` entries, and
+   * ``d_atom_virial`` has ``nall_nodes * 9`` entries. For compact canonical
+   * artifacts, ghost rows of ``d_atom_energy`` are zero. The edge arrays use
+   * ``edge_storage`` entries; each row-pointer array has ``nall_nodes + 1``
+   * entries. Edges must stay within their frame; ``d_source`` indices are
+   * global node indices. Let ``nedge`` be the physical edge count. Both CSR
+   * row-pointer arrays start at zero, are nondecreasing, and satisfy
+   * ``d_destination_row_ptr[nall_nodes] == d_source_row_ptr[nall_nodes] ==
+   * nedge``. The counts must satisfy ``0 <= nedge <= edge_storage`` and
+   * ``edge_storage >= max(nedge, 2)``. The first ``nedge`` entries are
+   * physical edges; entries in ``[nedge, edge_storage)`` are valid padding
+   * storage excluded from both CSR views. ``d_source_order[0:nedge]`` is a
+   * source-grouped permutation of ``[0, nedge)``. All indices address the
+   * concatenated node and edge axes.
+   *
+   * @param[out] d_atom_energy Full flattened per-node energy, GPU.
+   * @param[out] d_force Full flattened per-node force, GPU, row-major.
+   * @param[out] d_atom_virial Full flattened per-node virial, GPU, row-major.
+   * @param[in] d_atype Atom types, GPU, ``[nall_nodes]`` int64.
+   * @param[in] d_source Source indices, GPU, ``[edge_storage]`` uint32.
+   * @param[in] d_edge_vec Edge vectors, GPU, ``[edge_storage, 3]`` float32.
+   * @param[in] d_destination_row_ptr Destination CSR offsets, GPU,
+   *   ``[nall_nodes + 1]`` int64.
+   * @param[in] d_source_row_ptr Source CSR offsets, GPU,
+   *   ``[nall_nodes + 1]`` int64.
+   * @param[in] d_source_order Source-grouped physical-edge permutation plus
+   *   padding storage, GPU, ``[edge_storage]`` uint32; only ``[0, nedge)`` is
+   *   part of the permutation.
+   * @param[in] d_n_node Per-frame total node counts, GPU, ``[nframes]`` int64.
+   * @param[in] d_n_local Per-frame owned node counts, GPU, ``[nframes]`` int64.
+   * @param[in] nframes Number of packed frames.
+   * @param[in] nall_nodes Total nodes across all frames.
+   * @param[in] edge_storage Total stored edges across all frames.
+   */
   void compute_canonical_graph_gpu_batch(
       double* d_atom_energy,
       double* d_force,

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 #include "BackendPlugin.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <exception>
 #include <map>
@@ -257,14 +258,22 @@ std::shared_ptr<PluginHandle> load_plugin_with_symbols(
     plugin->handle = handle;
     plugin->path = candidate;
     try {
-      plugin->create_deeppot =
-          reinterpret_cast<deepmd::deepmd_create_deeppot_backend_fn>(
-              load_symbol(handle, candidate,
-                          deepmd::DEEPMD_DEEPPOT_PLUGIN_CREATE_SYMBOL));
-      plugin->delete_deeppot =
-          reinterpret_cast<deepmd::deepmd_delete_deeppot_backend_fn>(
-              load_symbol(handle, candidate,
-                          deepmd::DEEPMD_DEEPPOT_PLUGIN_DELETE_SYMBOL));
+      if (std::find(required_symbols.begin(), required_symbols.end(),
+                    deepmd::DEEPMD_DEEPPOT_PLUGIN_CREATE_SYMBOL) !=
+          required_symbols.end()) {
+        plugin->create_deeppot =
+            reinterpret_cast<deepmd::deepmd_create_deeppot_backend_fn>(
+                load_symbol(handle, candidate,
+                            deepmd::DEEPMD_DEEPPOT_PLUGIN_CREATE_SYMBOL));
+      }
+      if (std::find(required_symbols.begin(), required_symbols.end(),
+                    deepmd::DEEPMD_DEEPPOT_PLUGIN_DELETE_SYMBOL) !=
+          required_symbols.end()) {
+        plugin->delete_deeppot =
+            reinterpret_cast<deepmd::deepmd_delete_deeppot_backend_fn>(
+                load_symbol(handle, candidate,
+                            deepmd::DEEPMD_DEEPPOT_PLUGIN_DELETE_SYMBOL));
+      }
       plugin->free_error =
           reinterpret_cast<deepmd::deepmd_free_backend_error_fn>(
               load_symbol(handle, candidate,
@@ -292,7 +301,9 @@ std::shared_ptr<PluginHandle> load_plugin_with_symbols(
 }
 
 std::shared_ptr<PluginHandle> load_plugin(deepmd::DPBackend backend) {
-  return load_plugin_with_symbols(backend, std::vector<const char*>());
+  return load_plugin_with_symbols(
+      backend, {deepmd::DEEPMD_DEEPPOT_PLUGIN_CREATE_SYMBOL,
+                deepmd::DEEPMD_DEEPPOT_PLUGIN_DELETE_SYMBOL});
 }
 
 }  // namespace

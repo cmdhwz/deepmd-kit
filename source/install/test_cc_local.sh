@@ -144,6 +144,8 @@ else:
 	if [ "${DP_VARIANT}" = "cuda" ]; then
 		env ${_GEN_ENV} python ${INFER_SCRIPT_PATH}/gen_dpa4c_spin.py &
 		PID15=$!
+		env ${_GEN_ENV} python ${INFER_SCRIPT_PATH}/gen_dpa4c_canonical_batch.py &
+		PID16=$!
 	fi
 	wait $PID11
 	wait $PID12
@@ -151,6 +153,7 @@ else:
 	wait $PID14
 	if [ "${DP_VARIANT}" = "cuda" ]; then
 		wait $PID15
+		wait $PID16
 	fi
 fi
 if [ "${ENABLE_PADDLE:-TRUE}" == "TRUE" ]; then
